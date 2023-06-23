@@ -375,7 +375,7 @@ pub fn default_touch_input(
 ) {
     let cursor_position = touches.first_pressed_position();
     let released = touches.any_just_released();
-    let pressed = touches.iter().len > 0;
+    let pressed = touches.iter().count() > 0;
     generic_default_pointer_input(
         input_mapping,
         cursor_position,
