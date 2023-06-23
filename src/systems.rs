@@ -421,20 +421,60 @@ pub fn generic_default_mouse_input<T: ScreenSize + Component>(
         nav_cmds.send(NavRequest::Action);
     }
 }
+
+/// A system to send mouse control events to the focus system
+///
+/// Unlike [`generic_default_mouse_input`], this system is gated by the
+/// `bevy_ui` feature. It relies on bevy/render specific types:
+/// `bevy::render::Camera` and `bevy::ui::Node`.
+///
+/// Which button to press to cause an action event is specified in the
+/// [`InputMapping`] resource.
+///
+/// You may however need to customize the behavior of this system (typically
+/// when integrating in the game) in this case, you should write your own
+/// system that sends [`NavRequest`](crate::events::NavRequest) events. You may use
+/// [`ui_focusable_at`] to tell which focusable is currently being hovered.
+#[cfg(feature = "bevy_ui")]
+#[allow(clippy::too_many_arguments)]
+pub fn default_touch_input(
+    input_mapping: Res<InputMapping>,
+    focusables: NodePosQuery<Node>,
+    focused: Query<Entity, With<Focused>>,
+    nav_cmds: EventWriter<NavRequest>,
+    last_pos: Local<Vec2>,
+    touches: Res<Touches>,
+) {
+    let cursor_position = touches.first_pressed_position();
+    let released = touches.any_just_released();
+    let pressed = touches.any_just_pressed();
+    generic_default_pointer_input(
+        input_mapping,
+        cursor_position,
+        focusables,
+        focused,
+        nav_cmds,
+        last_pos,
+        released,
+        pressed,
+    );
+}
+
 /// A generic system to send touch control events to the focus system
 #[allow(clippy::too_many_arguments)]
-pub fn generic_default_touch_input<T: ScreenSize + Component>(
+pub fn generic_default_pointer_input<T: ScreenSize + Component>(
     input_mapping: Res<InputMapping>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
-    touches: Res<Touches>,
+    cursor_position: Option<Vec2>,
     focusables: NodePosQuery<T>,
     focused: Query<Entity, With<Focused>>,
     mut nav_cmds: EventWriter<NavRequest>,
     mut last_pos: Local<Vec2>,
+    released: bool,
+    pressed: bool,
 ) {
     let no_focusable_msg = "Entity with `Focused` component must also have a `Focusable` component";
-    let Ok(window) = primary_window.get_single() else { return; };
-    let cursor_pos = match cursor_pos(window) {
+
+    let cursor_pos = match cursor_position {
         Some(c) => c,
         None => return,
     };
@@ -442,8 +482,7 @@ pub fn generic_default_touch_input<T: ScreenSize + Component>(
         Some(c) => c,
         None => return,
     };
-    let released = touches.any_just_released();
-    let pressed = touches.any_just_pressed();
+
     let focused = focused.get_single();
 
     // Return early if cursor didn't move since last call
@@ -532,12 +571,14 @@ impl Plugin for DefaultNavigationSystems {
         use crate::NavRequestSystem;
         app.init_resource::<InputMapping>()
             .add_system(default_mouse_input.before(NavRequestSystem))
+            .add_system(default_touch_input.before(NavRequestSystem))
             .add_system(default_gamepad_input.before(NavRequestSystem))
             .add_system(default_keyboard_input.before(NavRequestSystem))
             .add_system(
                 update_boundaries
                     .before(NavRequestSystem)
-                    .before(default_mouse_input),
+                    .before(default_mouse_input)
+                    .before(default_touch_input),
             );
     }
 }
