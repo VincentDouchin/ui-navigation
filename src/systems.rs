@@ -334,92 +334,20 @@ pub fn default_mouse_input(
     nav_cmds: EventWriter<NavRequest>,
     last_pos: Local<Vec2>,
 ) {
-    generic_default_mouse_input(
+    let Ok(window) = windows.get_single() else { return; };
+    let cursor_position = cursor_pos(window);
+    let released = mouse.just_released(input_mapping.mouse_action);
+    let pressed = mouse.pressed(input_mapping.mouse_action);
+    generic_default_pointer_input(
         input_mapping,
-        windows,
-        mouse,
+        cursor_position,
         focusables,
         focused,
         nav_cmds,
         last_pos,
+        released,
+        pressed,
     );
-}
-
-/// A generic system to send mouse control events to the focus system
-///
-/// `T` must be a component assigned to `Focusable` elements that implements
-/// the [`ScreenSize`] trait.
-///
-/// Which button to press to cause an action event is specified in the
-/// [`InputMapping`] resource.
-///
-/// You may however need to customize the behavior of this system (typically
-/// when integrating in the game) in this case, you should write your own
-/// system that sends [`NavRequest`](crate::events::NavRequest) events. You may use
-/// [`ui_focusable_at`] to tell which focusable is currently being hovered.
-#[allow(clippy::too_many_arguments)]
-pub fn generic_default_mouse_input<T: ScreenSize + Component>(
-    input_mapping: Res<InputMapping>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
-    mouse: Res<Input<MouseButton>>,
-    focusables: NodePosQuery<T>,
-    focused: Query<Entity, With<Focused>>,
-    mut nav_cmds: EventWriter<NavRequest>,
-    mut last_pos: Local<Vec2>,
-) {
-    let no_focusable_msg = "Entity with `Focused` component must also have a `Focusable` component";
-    let Ok(window) = primary_window.get_single() else { return; };
-    let cursor_pos = match cursor_pos(window) {
-        Some(c) => c,
-        None => return,
-    };
-    let world_cursor_pos = match focusables.cursor_pos(cursor_pos) {
-        Some(c) => c,
-        None => return,
-    };
-    let released = mouse.just_released(input_mapping.mouse_action);
-    let pressed = mouse.pressed(input_mapping.mouse_action);
-    let focused = focused.get_single();
-
-    // Return early if cursor didn't move since last call
-    let camera_moved = focusables.boundaries.map_or(false, |b| b.is_changed());
-    let mouse_moved = *last_pos != cursor_pos;
-    if (!released && !pressed) && !mouse_moved && !camera_moved {
-        return;
-    } else {
-        *last_pos = cursor_pos;
-    }
-    // we didn't do it earlier so that we can leave early when the camera didn't move
-    let pressed = input_mapping.focus_follows_mouse || pressed;
-
-    let hovering_focused = |focused| {
-        let focused = focusables.entities.get(focused).expect(no_focusable_msg);
-        is_in_node(world_cursor_pos, &focused)
-    };
-    // If the currently hovered node is the focused one, there is no need to
-    // find which node we are hovering and to switch focus to it (since we are
-    // already focused on it)
-    let hovering = focused.map_or(false, hovering_focused);
-    let set_focused = (pressed || released) && !hovering;
-    if set_focused {
-        // We only run this code when we really need it because we iterate over all
-        // focusables, which can eat a lot of CPU.
-        let under_mouse = focusables
-            .entities
-            .iter()
-            .filter(|query_elem| query_elem.3.state() != FocusState::Blocked)
-            .filter(|query_elem| is_in_node(world_cursor_pos, query_elem))
-            .max_by_key(|elem| FloatOrd(elem.2.translation().z))
-            .map(|elem| elem.0);
-        let to_target = match under_mouse {
-            Some(c) => c,
-            None => return,
-        };
-        nav_cmds.send(NavRequest::FocusOn(to_target));
-    }
-    if released && (set_focused || hovering) {
-        nav_cmds.send(NavRequest::Action);
-    }
 }
 
 /// A system to send mouse control events to the focus system
