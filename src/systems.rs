@@ -372,13 +372,18 @@ pub fn default_touch_input(
     nav_cmds: EventWriter<NavRequest>,
     last_pos: Local<Vec2>,
     touches: Res<Touches>,
+    mut local_position: Local<Vec2>,
 ) {
-    let cursor_position = touches.first_pressed_position();
+    *local_position = if let Some(pos) = touches.first_pressed_position() {
+        pos
+    } else {
+        *local_position
+    };
     let released = touches.any_just_released();
     let pressed = touches.iter().count() > 0;
     generic_default_pointer_input(
         input_mapping,
-        cursor_position,
+        Some(*local_position),
         focusables,
         focused,
         nav_cmds,
@@ -505,8 +510,7 @@ impl Plugin for DefaultNavigationSystems {
             .add_system(
                 update_boundaries
                     .before(NavRequestSystem)
-                    .before(default_mouse_input)
-                    .before(default_touch_input),
+                    .before(default_mouse_input),
             );
     }
 }
