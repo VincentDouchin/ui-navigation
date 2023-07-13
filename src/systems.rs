@@ -6,10 +6,13 @@ use crate::{
 
 use bevy::utils::FloatOrd;
 use bevy::window::PrimaryWindow;
+#[cfg(feature = "bevy_reflect")]
+use bevy::{ecs::reflect::ReflectResource, reflect::Reflect};
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 /// Control default ui navigation input buttons
 #[derive(Resource)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect), reflect(Resource))]
 pub struct InputMapping {
     /// Whether to use keybaord keys for navigation (instead of just actions).
     pub keyboard_navigation: bool,
@@ -288,11 +291,7 @@ where
 }
 
 fn cursor_pos(window: &Window) -> Option<Vec2> {
-    let pos = window.cursor_position()?;
-    Some(Vec2 {
-        y: window.height() - pos.y,
-        ..pos
-    })
+    window.cursor_position()
 }
 
 /// Something that has a size on screen.
@@ -502,15 +501,15 @@ pub struct DefaultNavigationSystems;
 impl Plugin for DefaultNavigationSystems {
     fn build(&self, app: &mut App) {
         use crate::NavRequestSystem;
-        app.init_resource::<InputMapping>()
-            .add_system(default_mouse_input.before(NavRequestSystem))
-            .add_system(default_touch_input.before(NavRequestSystem))
-            .add_system(default_gamepad_input.before(NavRequestSystem))
-            .add_system(default_keyboard_input.before(NavRequestSystem))
-            .add_system(
-                update_boundaries
-                    .before(NavRequestSystem)
-                    .before(default_mouse_input),
-            );
+        app.init_resource::<InputMapping>().add_systems(
+            Update,
+            (
+                update_boundaries.before(default_mouse_input),
+                default_mouse_input,
+                default_gamepad_input,
+                default_keyboard_input,
+            )
+                .before(NavRequestSystem),
+        );
     }
 }

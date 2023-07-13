@@ -24,13 +24,14 @@ use bevy::{
         system::Query,
     },
     math::Vec2,
+    prelude::Event,
 };
 use non_empty_vec::NonEmpty;
 
 use crate::resolve::LockReason;
 
 /// Requests to send to the navigation system to update focus.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Event)]
 pub enum NavRequest {
     /// Move in in provided direction according to the plugin's [navigation strategy].
     ///
@@ -38,10 +39,12 @@ pub enum NavRequest {
     ///
     /// [navigation strategy]: crate::resolve::MenuNavigationStrategy.
     Move(Direction),
+
     /// Move within the encompassing [`MenuSetting::scope`].
     ///
     /// [`MenuSetting::scope`]: crate::prelude::MenuSetting::scope
     ScopeMove(ScopeDirection),
+
     /// Activate the currently focused [`Focusable`].
     ///
     /// If a menu is _[reachable from]_
@@ -49,10 +52,12 @@ pub enum NavRequest {
     /// [`Focusable`]: crate::prelude::Focusable
     /// [reachable from]: crate::menu::MenuBuilder::NamedParent
     Action,
+
     /// Leave this submenu to enter the one it is _[reachable from]_.
     ///
     /// [reachable from]: crate::menu::MenuBuilder::NamedParent
     Cancel,
+
     /// Move the focus to any arbitrary [`Focusable`] entity.
     ///
     /// Note that resolving a `FocusOn` request is expensive,
@@ -62,6 +67,7 @@ pub enum NavRequest {
     ///
     /// [`Focusable`]: crate::resolve::Focusable
     FocusOn(Entity),
+
     /// Locks the navigation system.
     ///
     /// A [`NavEvent::Locked`] will be emitted as a response if the
@@ -82,6 +88,7 @@ pub enum NavRequest {
 pub enum ScopeDirection {
     /// The next focusable in menu, usually goes right.
     Next,
+
     /// The previous focusable in menu, usually goes left.
     Previous,
 }
@@ -117,7 +124,7 @@ impl Direction {
 /// Useful if you want to react to [`NavEvent::NoChanges`] event, for example
 /// when a "start game" button is focused and the [`NavRequest::Action`] is
 /// pressed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 pub enum NavEvent {
     /// Tells the app which element is the first one to be focused.
     ///
@@ -151,6 +158,7 @@ pub enum NavEvent {
         /// active which is affected by the focus change
         from: NonEmpty<Entity>,
     },
+
     /// The [`NavRequest`] didn't lead to any change in focus.
     NoChanges {
         /// The active elements from the focused one to the last

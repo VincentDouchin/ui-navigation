@@ -35,6 +35,8 @@
 */
 #![forbid(missing_docs)]
 #![doc = include_str!("../Readme.md")]
+#![allow(clippy::unnecessary_lazy_evaluations)]
+
 mod commands;
 #[cfg(feature = "bevy_ui")]
 pub mod components;
@@ -47,7 +49,6 @@ pub mod systems;
 
 use std::marker::PhantomData;
 
-use bevy::app::PluginGroupBuilder;
 use bevy::ecs::system::{SystemParam, SystemParamItem};
 use bevy::prelude::*;
 
@@ -98,8 +99,13 @@ impl<T> NavMarkerPropagationPlugin<T> {
 
 impl<T: 'static + Sync + Send + Component + Clone> Plugin for NavMarkerPropagationPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_system(marker::mark_new_menus::<T>)
-            .add_system(marker::mark_new_focusables::<T>);
+        app.add_systems(
+            Update,
+            (
+                marker::mark_new_menus::<T>,
+                marker::mark_new_focusables::<T>,
+            ),
+        );
     }
 }
 
@@ -188,24 +194,32 @@ where
 {
     fn build(&self, app: &mut App) {
         #[cfg(feature = "bevy_reflect")]
-        app.register_type::<resolve::Focusable>()
-            .register_type::<resolve::FocusState>()
+        app.register_type::<menu::MenuSetting>()
+            .register_type::<resolve::Focusable>()
             .register_type::<resolve::FocusAction>()
-            .register_type::<menu::MenuSetting>()
-            .register_type::<resolve::TreeMenu>();
+            .register_type::<resolve::FocusState>()
+            .register_type::<resolve::LockReason>()
+            .register_type::<resolve::NavLock>()
+            .register_type::<resolve::Rect>()
+            .register_type::<resolve::ScreenBoundaries>()
+            .register_type::<resolve::TreeMenu>()
+            .register_type::<systems::InputMapping>();
 
         app.add_event::<events::NavRequest>()
             .add_event::<events::NavEvent>()
             .insert_resource(resolve::NavLock::new())
-            .add_system(resolve::set_first_focused.before(NavRequestSystem))
-            .add_system(resolve::consistent_menu.before(NavRequestSystem))
-            .add_system(resolve::listen_nav_requests::<STGY>.in_set(NavRequestSystem))
-            .add_system(
-                named::resolve_named_menus
-                    .before(resolve::insert_tree_menus)
-                    .in_base_set(CoreSet::PreUpdate),
+            .add_systems(
+                Update,
+                (
+                    (resolve::set_first_focused, resolve::consistent_menu),
+                    resolve::listen_nav_requests::<STGY>.in_set(NavRequestSystem),
+                )
+                    .chain(),
             )
-            .add_system(resolve::insert_tree_menus.in_base_set(CoreSet::PreUpdate));
+            .add_systems(
+                PreUpdate,
+                (named::resolve_named_menus, resolve::insert_tree_menus).chain(),
+            );
     }
 }
 
@@ -220,8 +234,8 @@ where
 pub struct DefaultNavigationPlugins;
 #[cfg(feature = "bevy_ui")]
 impl PluginGroup for DefaultNavigationPlugins {
-    fn build(self) -> PluginGroupBuilder {
-        PluginGroupBuilder::start::<Self>()
+    fn build(self) -> bevy::app::PluginGroupBuilder {
+        bevy::app::PluginGroupBuilder::start::<Self>()
             .add(NavigationPlugin::new())
             .add(systems::DefaultNavigationSystems)
     }
@@ -460,7 +474,7 @@ mod test {
         }
         fn new(hierarchy: SpawnHierarchy) -> Self {
             let mut app = App::new();
-            app.add_plugin(GenericNavigationPlugin::<MockNavigationStrategy>::new());
+            app.add_plugins(GenericNavigationPlugin::<MockNavigationStrategy>::new());
             hierarchy.spawn(&mut app.world);
             // Run once to convert the `MenuSetting` and `MenuBuilder` into `TreeMenu`.
             app.update();

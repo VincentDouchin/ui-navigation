@@ -42,15 +42,16 @@ column_type!(enum RightColMenu, 6);
 /// leftmost/rightmost buttons in the menus.
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        // We must add the NavMarker plugin for each menu marker types we want
-        .add_plugin(NavMarkerPropagationPlugin::<LeftColMenu>::new())
-        .add_plugin(NavMarkerPropagationPlugin::<CenterColMenu>::new())
-        .add_plugin(NavMarkerPropagationPlugin::<RightColMenu>::new())
-        .add_plugins(DefaultNavigationPlugins)
-        .add_startup_system(setup)
-        .add_system(button_system.after(NavRequestSystem))
-        .add_system(print_menus.after(NavRequestSystem))
+        .add_plugins((
+            DefaultPlugins,
+            // We must add the NavMarker plugin for each menu marker types we want
+            NavMarkerPropagationPlugin::<LeftColMenu>::new(),
+            NavMarkerPropagationPlugin::<CenterColMenu>::new(),
+            NavMarkerPropagationPlugin::<RightColMenu>::new(),
+            DefaultNavigationPlugins,
+        ))
+        .add_systems(Startup, setup)
+        .add_systems(Update, (button_system, print_menus).after(NavRequestSystem))
         .run();
 }
 
@@ -116,12 +117,14 @@ fn setup(mut commands: Commands) {
     let good_margin = UiRect::all(Val::Px(20.0));
     // white background
     let root = bndl!(Color::WHITE, {
-        size: Size::new(Pct(100.0), Pct(100.0)),
+        width: Pct(100.),
+        height: Pct(100.),
         flex_direction: Row,
     });
     // root menu to access each `cell`
     let keyboard = bndl!(Color::DARK_GRAY, {
-        size: Size::new(Px(50.0 * 3.2), Px(50.0 * 3.2)),
+        width: Px(50.0 * 3.2),
+        height: Px(50.0 * 3.2),
         flex_direction: Column,
         flex_wrap: FlexWrap::Wrap,
     });
@@ -137,7 +140,8 @@ fn setup(mut commands: Commands) {
     });
     // navigable buttons within columns
     let button = bndl!(Color::BLACK, {
-        size: Size::new(Px(40.0), Px(40.0)),
+        width: Px(40.),
+        height: Px(40.),
         margin: UiRect::all(Px(5.0)),
     });
     // spawn nine different buttons for the keyboard menu

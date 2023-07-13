@@ -4,6 +4,7 @@ use bevy_ui_navigation::events::{Direction, NavRequest};
 use bevy_ui_navigation::prelude::{
     DefaultNavigationPlugins, FocusState, Focusable, NavRequestSystem,
 };
+use bevy_ui_navigation::systems::InputMapping;
 
 /// This example shows what happens when there is a lot of focusables on screen.
 /// It doesn't run well on debug builds, you should try running it with the `--release`
@@ -15,11 +16,15 @@ use bevy_ui_navigation::prelude::{
 /// You can toggle automatic generation of NavRequest with the `K` key.
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(DefaultNavigationPlugins)
-        .add_startup_system(setup)
-        .add_system(button_system.after(NavRequestSystem))
-        .add_system(non_stop_move.before(NavRequestSystem))
+        .add_plugins((DefaultPlugins, DefaultNavigationPlugins))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                non_stop_move.before(NavRequestSystem),
+                button_system.after(NavRequestSystem),
+            ),
+        )
         .run();
 }
 
@@ -77,7 +82,10 @@ fn non_stop_move(
     }
 }
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, mut input_mapping: ResMut<InputMapping>) {
+    use Val::Percent as Pct;
+    input_mapping.keyboard_navigation = true;
+    input_mapping.focus_follows_mouse = true;
     let top = 310;
     let as_rainbow = |i: u32| Color::hsl((i as f32 / top as f32) * 360.0, 0.9, 0.8);
     commands.spawn(Camera2dBundle::default());
@@ -85,7 +93,8 @@ fn setup(mut commands: Commands) {
         .spawn(NodeBundle {
             style: Style {
                 // position_type: PositionType::Absolute,
-                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                width: Pct(100.),
+                height: Pct(100.),
                 ..default()
             },
             ..default()
@@ -99,17 +108,15 @@ fn setup(mut commands: Commands) {
         });
 }
 fn spawn_button(commands: &mut ChildBuilder, color: BackgroundColor, max: u32, i: u32, j: u32) {
+    use Val::Percent as Pct;
     let width = 90.0 / max as f32;
     commands.spawn((
         ButtonBundle {
             style: Style {
-                size: Size::new(Val::Percent(width), Val::Percent(width)),
-
-                position: UiRect {
-                    bottom: Val::Percent((100.0 / max as f32) * i as f32),
-                    left: Val::Percent((100.0 / max as f32) * j as f32),
-                    ..default()
-                },
+                width: Pct(width),
+                height: Pct(width),
+                bottom: Pct((100.0 / max as f32) * i as f32),
+                left: Pct((100.0 / max as f32) * j as f32),
                 position_type: PositionType::Absolute,
                 ..Default::default()
             },
