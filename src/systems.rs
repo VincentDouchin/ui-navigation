@@ -506,6 +506,7 @@ impl Plugin for DefaultNavigationSystems {
             (
                 update_boundaries.before(default_mouse_input),
                 default_mouse_input,
+                default_touch_input,
                 default_gamepad_input,
                 default_keyboard_input,
             )
